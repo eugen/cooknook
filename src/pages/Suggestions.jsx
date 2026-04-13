@@ -4,13 +4,13 @@ import { useRecipes } from '../hooks/useRecipes'
 import { useIngredients } from '../hooks/useIngredients'
 import { useCookLog } from '../hooks/useCookLog'
 import { Button, ErrorMessage, Spinner } from '../components/ui'
-import { getCurrentSeason, SEASON_EMOJI } from '../lib/utils'
+import { getCurrentSeason, SEASON_EMOJI, NUTRITION_GROUP_COLORS } from '../lib/utils'
 
 const season = getCurrentSeason()
 
 const PRIMARY_MODES = [
   { id: 'seasonal',   icon: SEASON_EMOJI[season], label: 'Seasonal pick',   desc: `A ${season} recipe you haven't made recently` },
-  { id: 'meal',       icon: '🍽️',               label: 'Complete a meal', desc: 'Main + sides + maybe a salad' },
+  { id: 'meal',       icon: '🍽️',               label: 'Complete a meal', desc: 'Protein + carbs + produce, with a fat' },
   { id: 'ingredient', icon: '🧅',               label: 'From ingredient', desc: 'Start with one thing, find what pairs' },
 ]
 
@@ -140,7 +140,7 @@ export default function Suggestions() {
             </p>
           )}
           {result.mode === 'meal'
-            ? result.meals?.map((m, i) => <MealCard key={i} meal={m} recipes={recipes} />)
+            ? result.meals?.map((m, i) => <MealCard key={i} meal={m} />)
             : result.mode === 'new'
             ? result.ideas?.map((idea, i) => <NewIdeaCard key={i} idea={idea} />)
             : result.suggestions?.map((s, i) => <SuggestionCard key={i} suggestion={s} recipes={recipes} />)
@@ -194,26 +194,25 @@ function SuggestionCard({ suggestion, recipes }) {
   )
 }
 
-function MealCard({ meal, recipes }) {
-  const linked = recipes.find(r => r.name.toLowerCase() === meal.recipe?.toLowerCase())
+function MealCard({ meal }) {
+  const chips = [
+    meal.protein && { group: 'protein', name: meal.protein },
+    meal.carbs   && { group: 'carbs',   name: meal.carbs },
+    meal.produce && { group: 'produce', name: meal.produce },
+    meal.fat     && { group: 'fat',     name: meal.fat },
+  ].filter(Boolean)
+
   return (
     <div className="card p-5">
-      <div className="mb-2.5">
-        {linked ? (
-          <Link to={`/recipes/${linked.id}`} className="font-display text-lg text-ember-500 hover:text-ember-600 transition-colors">
-            {meal.recipe}
-          </Link>
-        ) : (
-          <p className="font-display text-lg text-nook-dark">{meal.recipe}</p>
-        )}
+      <p className="font-display text-lg text-nook-dark mb-3">{meal.title}</p>
+      <div className="flex flex-wrap gap-2 mb-3">
+        {chips.map(({ group, name }) => (
+          <span key={group} className={`text-xs px-2.5 py-1 rounded-full font-body capitalize ${NUTRITION_GROUP_COLORS[group] ?? 'bg-parchment-100 text-nook-ink'}`}>
+            {name}
+          </span>
+        ))}
       </div>
-      <div className="flex flex-wrap gap-2 mb-2.5">
-        <span className="text-xs bg-parchment-100 text-nook-ink px-2.5 py-1 rounded-full font-body">+ {meal.side}</span>
-        {meal.salad && (
-          <span className="text-xs bg-sage-400/15 text-sage-700 px-2.5 py-1 rounded-full font-body">+ {meal.salad}</span>
-        )}
-      </div>
-      <p className="text-sm text-nook-ink font-body">{meal.reason}</p>
+      <p className="text-sm text-nook-ink font-body">{meal.description}</p>
     </div>
   )
 }
@@ -261,19 +260,33 @@ Respond ONLY with JSON, no markdown:
   }
 
   if (mode === 'meal') {
+    const byGroup = {}
+    for (const i of ingredientsSummary) {
+      if (i.nutrition_group) {
+        ;(byGroup[i.nutrition_group] ??= []).push(i.name)
+      }
+    }
     return `${ctx}
 
-Suggest 2-3 complete meal combinations. Each should have a main recipe FROM THEIR SAVED RECIPE LIST, a simple side dish, and optionally a salad — using pantry ingredients where possible.
+Suggest 2-3 meal combinations built from their pantry ingredients. Each meal should pick:
+- one protein (from: ${byGroup.protein?.join(', ') || 'anything suitable'})
+- one carb (from: ${byGroup.carbs?.join(', ') || 'anything suitable'})
+- one produce/filler (from: ${byGroup.produce?.join(', ') || 'anything suitable'})
+- optionally one fat (from: ${byGroup.fat?.join(', ') || 'e.g. olive oil, butter'})
+
+Make the combinations feel like coherent, tasty meals. Consider the current season (${season}).
 
 Respond ONLY with JSON, no markdown:
 {
   "intro": "<one warm sentence>",
   "meals": [
     {
-      "recipe": "<exact recipe name from their list>",
-      "side": "<simple side dish>",
-      "salad": "<simple salad, or null>",
-      "reason": "<1-2 sentences>"
+      "title": "<short meal name, e.g. 'Rice bowl with greens'>",
+      "protein": "<ingredient name>",
+      "carbs": "<ingredient name>",
+      "produce": "<ingredient name>",
+      "fat": "<ingredient name or null>",
+      "description": "<1-2 sentences on how to bring it together>"
     }
   ]
 }`
