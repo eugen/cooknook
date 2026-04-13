@@ -1,10 +1,24 @@
 // ── Season detection (Northern Hemisphere) ──────────────────────────────────
-export function getCurrentSeason() {
-  const month = new Date().getMonth() + 1 // 1-12
-  if (month >= 3 && month <= 5)  return 'spring'
-  if (month >= 6 && month <= 8)  return 'summer'
-  if (month >= 9 && month <= 11) return 'autumn'
+function monthToSeason(m) {
+  if (m >= 3 && m <= 5)  return 'spring'
+  if (m >= 6 && m <= 8)  return 'summer'
+  if (m >= 9 && m <= 11) return 'autumn'
   return 'winter'
+}
+
+export function getCurrentSeason() {
+  return monthToSeason(new Date().getMonth() + 1)
+}
+
+// Returns the 1–3 seasons that overlap with a ±1 month window around today.
+// e.g. in May (end of spring) → ['spring', 'summer']
+//      in mid-April           → ['spring']
+//      in March (start of spring) → ['winter', 'spring']
+export function getSeasonalWindow() {
+  const month = new Date().getMonth() + 1 // 1-12
+  const prev  = month === 1 ? 12 : month - 1
+  const next  = month === 12 ? 1 : month + 1
+  return [...new Set([prev, month, next].map(monthToSeason))]
 }
 
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter']
@@ -68,4 +82,16 @@ export function parseTags(value) {
   return value.split(',').map(t => t.trim()).filter(Boolean)
 }
 
-export const PANTRY_QUANTITIES = ['lots', 'some', 'running low', 'out']
+// ── Nutrition groups ──────────────────────────────────────────────────────────
+// protein = meat, fish, legumes, dairy etc.
+// carbs   = grains, pasta, starchy veg etc.
+// fat     = oils, nuts, seeds, butter etc.
+// produce = low-calorie volumetric ingredients (veg, herbs, aromatics)
+export const NUTRITION_GROUPS = ['protein', 'carbs', 'fat', 'produce']
+
+export const NUTRITION_GROUP_COLORS = {
+  protein: 'bg-sky-100 text-sky-700',
+  carbs:   'bg-amber-100 text-amber-700',
+  fat:     'bg-orange-100 text-orange-700',
+  produce: 'bg-sage-400/20 text-sage-600',
+}

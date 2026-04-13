@@ -32,7 +32,7 @@ create table ingredients (
   notes            text,
   tags             text[]  default '{}',
   season           text[]  default '{}',
-  pantry_quantity  text    default 'some', -- 'lots' | 'some' | 'running low' | 'out'
+  nutrition_group  text,                  -- 'protein' | 'carbs' | 'fat' | 'produce'
   last_used_at     timestamptz,
   created_at       timestamptz default now()
 );
@@ -86,12 +86,12 @@ values
     180, 2, 'manual'
   );
 
-insert into ingredients (name, pantry_quantity, tags, season)
+insert into ingredients (name, tags, season)
 values
-  ('Rice',            'lots',        array['staple', 'carb'],   array[]::text[]),
-  ('Pasta',           'lots',        array['staple', 'carb'],   array[]::text[]),
-  ('Canned tomatoes', 'lots',        array['staple'],           array[]::text[]),
-  ('Kidney beans',    'some',        array['staple', 'protein'],array[]::text[]),
-  ('Olive oil',       'lots',        array['staple'],           array[]::text[]),
-  ('Chicken thighs',  'running low', array['protein'],          array[]::text[]),
-  ('Leafy greens',    'some',        array['vegetable'],        array['spring', 'summer']);
+  ('Rice',            array['staple', 'carb'],    array[]::text[]),
+  ('Pasta',           array['staple', 'carb'],    array[]::text[]),
+  ('Canned tomatoes', array['staple'],             array[]::text[]),
+  ('Kidney beans',    array['staple', 'protein'],  array[]::text[]),
+  ('Olive oil',       array['staple'],             array[]::text[]),
+  ('Chicken thighs',  array['protein'],            array[]::text[]),
+  ('Leafy greens',    array['vegetable'],          array['spring', 'summer']);

@@ -1,25 +1,58 @@
 import { useState } from 'react'
 import { useIngredients } from '../hooks/useIngredients'
 import { LoadingPage, EmptyState, Button, Tag, ErrorMessage } from '../components/ui'
-import { SEASONS, PANTRY_QUANTITIES, parseTags } from '../lib/utils'
+import {
+  SEASONS, NUTRITION_GROUPS, NUTRITION_GROUP_COLORS,
+  parseTags, getSeasonalWindow,
+} from '../lib/utils'
 
-const EMPTY = { name: '', notes: '', tags: [], season: [], pantry_quantity: 'some' }
+const EMPTY = { name: '', notes: '', tags: [], season: [], nutrition_group: null }
+
+function FilterBar({ label, options, value, onChange }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs text-nook-muted font-body w-16 shrink-0">{label}</span>
+      <div className="flex gap-1.5 flex-wrap">
+        {options.map(([val, lbl]) => (
+          <button key={val} onClick={() => onChange(val)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-body transition-colors
+              ${value === val
+                ? 'bg-nook-dark text-parchment-50'
+                : 'bg-parchment-100 text-nook-ink hover:bg-parchment-200'}`}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function Ingredients() {
   const { ingredients, loading, createIngredient, updateIngredient, deleteIngredient } = useIngredients()
-  const [search, setSearch]   = useState('')
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing]  = useState(null) // ingredient id
-  const [form, setForm]        = useState(EMPTY)
-  const [tagText, setTagText]  = useState('')
-  const [saving, setSaving]    = useState(false)
-  const [error, setError]      = useState(null)
+  const [search, setSearch]               = useState('')
+  const [seasonFilter, setSeasonFilter]   = useState('seasonal')
+  const [nutritionFilter, setNutritionFilter] = useState('all')
+  const [showForm, setShowForm]           = useState(false)
+  const [editing, setEditing]             = useState(null)
+  const [form, setForm]                   = useState(EMPTY)
+  const [tagText, setTagText]             = useState('')
+  const [saving, setSaving]               = useState(false)
+  const [error, setError]                 = useState(null)
 
   if (loading) return <LoadingPage />
 
-  const filtered = ingredients.filter(i =>
-    i.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const seasonalWindow = getSeasonalWindow()
+
+  const filtered = ingredients.filter(i => {
+    if (search && !i.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (seasonFilter === 'seasonal') {
+      if (i.season?.length > 0 && !i.season.some(s => seasonalWindow.includes(s))) return false
+    } else if (seasonFilter !== 'all') {
+      if (i.season?.length > 0 && !i.season.includes(seasonFilter)) return false
+    }
+    if (nutritionFilter !== 'all' && i.nutrition_group !== nutritionFilter) return false
+return true
+  })
 
   const openNew = () => {
     setEditing(null); setForm(EMPTY); setTagText(''); setShowForm(true)
@@ -33,7 +66,8 @@ export default function Ingredients() {
   const closeForm = () => { setShowForm(false); setEditing(null); setError(null) }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const toggleSeason = s => set('season', form.season.includes(s) ? form.season.filter(x => x !== s) : [...form.season, s])
+  const toggleSeason    = s => set('season', form.season.includes(s) ? form.season.filter(x => x !== s) : [...form.season, s])
+  const toggleNutrition = g => set('nutrition_group', form.nutrition_group === g ? null : g)
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Name is required'); return }
@@ -57,7 +91,7 @@ export default function Ingredients() {
       <div className="flex items-end justify-between mb-6">
         <div>
           <h1 className="font-display text-3xl text-nook-dark">Pantry</h1>
-          <p className="text-nook-muted text-sm mt-0.5">{ingredients.length} ingredients</p>
+          <p className="text-nook-muted text-sm mt-0.5">{filtered.length} of {ingredients.length} ingredients</p>
         </div>
         <Button onClick={openNew} variant="primary">+ Add ingredient</Button>
       </div>
@@ -72,16 +106,23 @@ export default function Ingredients() {
             <input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Rice, chicken thighs, olive oil…" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Pantry stock</label>
-              <select className="input" value={form.pantry_quantity} onChange={e => set('pantry_quantity', e.target.value)}>
-                {PANTRY_QUANTITIES.map(q => <option key={q} value={q}>{q}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Tags</label>
-              <input className="input" value={tagText} onChange={e => setTagText(e.target.value)} placeholder="protein, staple…" />
+          <div>
+            <label className="label">Tags</label>
+            <input className="input" value={tagText} onChange={e => setTagText(e.target.value)} placeholder="staple, spice…" />
+          </div>
+
+          <div>
+            <label className="label">Nutrition group</label>
+            <div className="flex gap-2 flex-wrap">
+              {NUTRITION_GROUPS.map(g => (
+                <button key={g} type="button" onClick={() => toggleNutrition(g)}
+                  className={`px-3 py-1 rounded-lg text-xs capitalize transition-colors font-body
+                    ${form.nutrition_group === g
+                      ? 'bg-nook-dark text-parchment-50'
+                      : 'bg-parchment-100 text-nook-ink hover:bg-parchment-200'}`}>
+                  {g}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -111,14 +152,30 @@ export default function Ingredients() {
         </div>
       )}
 
-      {/* Search */}
-      <input type="search" placeholder="Search pantry…" value={search}
-        onChange={e => setSearch(e.target.value)} className="input mb-4" />
+      {/* Search + Filters */}
+      <div className="mb-4 space-y-2.5">
+        <input type="search" placeholder="Search pantry…" value={search}
+          onChange={e => setSearch(e.target.value)} className="input" />
+        <div className="p-3 bg-parchment-50 rounded-xl border border-parchment-200 space-y-2">
+          <FilterBar
+            label="Season"
+            options={[['all', 'All'], ['seasonal', 'In season'], ...SEASONS.map(s => [s, s])]}
+            value={seasonFilter}
+            onChange={setSeasonFilter}
+          />
+          <FilterBar
+            label="Nutrition"
+            options={[['all', 'All'], ...NUTRITION_GROUPS.map(g => [g, g])]}
+            value={nutritionFilter}
+            onChange={setNutritionFilter}
+          />
+        </div>
+      </div>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <EmptyState icon="🧅" title="No ingredients yet" description="Add your pantry staples and favourite ingredients."
-          action={<Button onClick={openNew}>Add first ingredient</Button>} />
+        <EmptyState icon="🧅" title="No ingredients found" description="Try adjusting the filters, or add a new ingredient."
+          action={<Button onClick={openNew}>Add ingredient</Button>} />
       ) : (
         <div className="grid gap-2 stagger">
           {filtered.map(ing => (
@@ -128,15 +185,12 @@ export default function Ingredients() {
                 {ing.notes && <p className="text-xs text-nook-muted mt-0.5 truncate font-body">{ing.notes}</p>}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {ing.pantry_quantity && (
-                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full
-                    ${ing.pantry_quantity === 'lots' ? 'bg-sage-400/20 text-sage-600' :
-                      ing.pantry_quantity === 'out'  ? 'bg-ember-500/10 text-ember-600' :
-                      'bg-parchment-100 text-nook-muted'}`}>
-                    {ing.pantry_quantity}
+                {ing.nutrition_group && (
+                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full capitalize ${NUTRITION_GROUP_COLORS[ing.nutrition_group] ?? 'bg-parchment-100 text-nook-muted'}`}>
+                    {ing.nutrition_group}
                   </span>
                 )}
-                {ing.season?.map(s => <Tag key={s} variant="season">{s}</Tag>)}
+{ing.season?.map(s => <Tag key={s} variant="season">{s}</Tag>)}
                 <button onClick={() => openEdit(ing)} className="text-nook-muted hover:text-nook-dark transition-colors text-xs font-mono px-2 py-1">edit</button>
                 <button onClick={() => handleDelete(ing.id, ing.name)} className="text-nook-muted hover:text-ember-500 transition-colors text-xs font-mono px-2 py-1">×</button>
               </div>
