@@ -88,17 +88,12 @@ export default function Recipes() {
     if (!url) return
     setImpLoad(true); setImpError(null)
     try {
-      // Step 1: try two CORS proxies to get raw HTML for JSON-LD parsing
+      // Step 1: fetch raw HTML via our own serverless proxy for JSON-LD parsing
       let html = null
-      for (const proxyUrl of [
-        `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      ]) {
-        try {
-          const res = await fetch(proxyUrl)
-          if (res.ok) { html = await res.text(); break }
-        } catch {}
-      }
+      try {
+        const res = await fetch(`/api/fetch-recipe?url=${encodeURIComponent(url)}`)
+        if (res.ok) html = await res.text()
+      } catch {}
 
       if (html) {
         const prefill = extractJsonLd(html)
