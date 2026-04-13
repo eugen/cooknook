@@ -11,7 +11,7 @@ const season = getCurrentSeason()
 const PRIMARY_MODES = [
   { id: 'seasonal',   icon: SEASON_EMOJI[season], label: 'Seasonal pick',   desc: `A ${season} recipe you haven't made recently` },
   { id: 'meal',       icon: '🍽️',               label: 'Complete a meal', desc: 'Protein & carbs combinations' },
-  { id: 'ingredient', icon: '🧅',               label: 'From ingredient', desc: 'Start with one thing, find what pairs' },
+  { id: 'ingredient', icon: '🧅',               label: 'From ingredient', desc: 'Pick ingredients and find what works together' },
 ]
 
 const SECONDARY_MODE = { id: 'new', icon: '✨', label: 'New recipe idea', desc: "AI suggests something not in your book yet" }
@@ -22,15 +22,18 @@ export default function Suggestions() {
   const { log }         = useCookLog()
 
   const [mode, setMode]                     = useState(null)
-  const [selectedIngredient, setIngredient] = useState('')
+  const [selectedIngredients, setSelectedIngredients] = useState([])
   const [newHint, setNewHint]               = useState('')
   const [result, setResult]                 = useState(null)
   const [loading, setLoading]               = useState(false)
   const [error, setError]                   = useState(null)
 
-  const setModeAndReset = (m) => { setMode(m); setResult(null); setError(null) }
+  const setModeAndReset = (m) => { setMode(m); setResult(null); setError(null); setSelectedIngredients([]) }
 
-  const canSubmit = mode && !loading && (mode !== 'ingredient' || selectedIngredient)
+  const toggleIngredient = (name) =>
+    setSelectedIngredients(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name])
+
+  const canSubmit = mode && !loading && (mode !== 'ingredient' || selectedIngredients.length > 0)
 
   const getSuggestion = async () => {
     setLoading(true); setError(null); setResult(null)
@@ -53,7 +56,7 @@ export default function Suggestions() {
         name: i.name, season: i.season, tags: i.tags, nutrition_group: i.nutrition_group,
       }))
 
-      const prompt = buildPrompt({ mode, season, recipesSummary, ingredientsSummary, recentCooks, selectedIngredient, newHint })
+      const prompt = buildPrompt({ mode, season, recipesSummary, ingredientsSummary, recentCooks, selectedIngredients, newHint })
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -115,14 +118,40 @@ export default function Suggestions() {
 
       {/* Mode extras */}
       {mode === 'ingredient' && (
-        <div className="mb-4 animate-fade-in">
-          <label className="label">Which ingredient?</label>
-          <select className="input" value={selectedIngredient} onChange={e => setIngredient(e.target.value)}>
-            <option value="">Pick an ingredient…</option>
-            {[...ingredients].sort((a, b) => a.name.localeCompare(b.name)).map(i => (
-              <option key={i.id} value={i.name}>{i.name}</option>
-            ))}
-          </select>
+        <div className="mb-4 animate-fade-in space-y-3">
+          {['protein', 'carbs', 'produce'].map(group => {
+            const items = ingredients.filter(i => i.nutrition_group === group)
+            if (!items.length) return null
+            return (
+              <div key={group}>
+                <p className={`text-xs font-mono uppercase tracking-wide mb-2 capitalize
+                  ${group === 'protein' ? 'text-sky-600' : group === 'carbs' ? 'text-amber-600' : 'text-sage-600'}`}>
+                  {group}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {items.sort((a, b) => a.name.localeCompare(b.name)).map(i => {
+                    const on = selectedIngredients.includes(i.name)
+                    return (
+                      <button key={i.id} type="button" onClick={() => toggleIngredient(i.name)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-body transition-colors
+                          ${on
+                            ? group === 'protein' ? 'bg-sky-100 text-sky-700 ring-1 ring-sky-300'
+                            : group === 'carbs'   ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-300'
+                            :                       'bg-sage-400/20 text-sage-700 ring-1 ring-sage-300'
+                            : 'bg-parchment-100 text-nook-ink hover:bg-parchment-200'}`}>
+                        {i.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+          {!['protein', 'carbs', 'produce'].some(g => ingredients.some(i => i.nutrition_group === g)) && (
+            <p className="text-xs text-nook-muted font-body">
+              No ingredients with nutrition groups yet — add them in the Pantry.
+            </p>
+          )}
         </div>
       )}
 
@@ -242,7 +271,7 @@ function NewIdeaCard({ idea }) {
   )
 }
 
-function buildPrompt({ mode, season, recipesSummary, ingredientsSummary, recentCooks, selectedIngredient, newHint }) {
+function buildPrompt({ mode, season, recipesSummary, ingredientsSummary, recentCooks, selectedIngredients, newHint }) {
   const ctx = `You are a thoughtful home cooking assistant for a family of 2.
 Current season: ${season}
 Their saved recipes: ${JSON.stringify(recipesSummary)}
@@ -301,17 +330,19 @@ Respond ONLY with JSON, no markdown:
   }
 
   if (mode === 'ingredient') {
+    const chosen = selectedIngredients.join(', ')
+    const multiple = selectedIngredients.length > 1
     return `${ctx}
 
-The user wants to cook with: ${selectedIngredient}
+The user has selected these ingredients to cook with: ${chosen}
 
 Give:
-1. 2-3 of their SAVED RECIPES that feature or pair well with ${selectedIngredient}
-2. 2-3 ingredient pairing ideas (other pantry ingredients that go beautifully with ${selectedIngredient})
+1. 2-3 of their SAVED RECIPES that feature or pair well with ${multiple ? 'some or all of these ingredients' : chosen}
+2. 2-3 ideas for how to combine ${multiple ? 'these ingredients together' : `${chosen} with other pantry ingredients`} into a simple dish (not necessarily from their recipe list)
 
 Respond ONLY with JSON, no markdown:
 {
-  "intro": "<one warm sentence about ${selectedIngredient}>",
+  "intro": "<one warm sentence about these ingredients>",
   "suggestions": [
     {
       "type": "recipe",
@@ -319,9 +350,9 @@ Respond ONLY with JSON, no markdown:
       "reason": "<1-2 sentences>"
     },
     {
-      "type": "pairing",
-      "name": "<ingredient combo, e.g. 'chicken + lemon + capers'>",
-      "reason": "<1-2 sentences>"
+      "type": "idea",
+      "name": "<short dish name or combo, e.g. 'pan-fried chicken with rice and wilted greens'>",
+      "reason": "<1-2 sentences on how to make it work>"
     }
   ]
 }`
