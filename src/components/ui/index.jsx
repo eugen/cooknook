@@ -67,6 +67,37 @@ export function Divider() {
   return <hr className="border-parchment-200 my-6" />
 }
 
+// ── Recipe card ───────────────────────────────────────────────────────────────
+import { Link } from 'react-router-dom'
+import { lastCookedLabel, calorieLabelColor } from '../../lib/utils'
+
+export function RecipeCard({ recipe }) {
+  const cal = recipe.calories_per_portion
+  return (
+    <Link to={`/recipes/${recipe.id}`} className="card p-4 flex items-center justify-between group">
+      <div className="flex-1 min-w-0 mr-4">
+        <p className="font-display text-lg leading-snug text-nook-dark group-hover:text-ember-500 transition-colors">
+          {recipe.name}
+        </p>
+        <p className="text-xs text-nook-muted font-mono mt-0.5">
+          {lastCookedLabel(recipe.last_cooked_at)}
+        </p>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        {recipe.season?.filter(s => s !== 'all').map(s => (
+          <Tag key={s} variant="season">{s}</Tag>
+        ))}
+        {cal && (
+          <span className={`text-sm font-mono font-medium ${calorieLabelColor(cal)}`}>
+            {cal} kcal
+          </span>
+        )}
+        <span className="text-parchment-300 group-hover:text-parchment-400 transition-colors">→</span>
+      </div>
+    </Link>
+  )
+}
+
 // ── Inline error ──────────────────────────────────────────────────────────────
 export function ErrorMessage({ message }) {
   if (!message) return null

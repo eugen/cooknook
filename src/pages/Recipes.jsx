@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useRecipes } from '../hooks/useRecipes'
-import { LoadingPage, EmptyState, Button, Tag, ErrorMessage, Spinner } from '../components/ui'
-import { lastCookedLabel, calorieLabelColor, getCurrentSeason } from '../lib/utils'
+import { LoadingPage, EmptyState, Button, Tag, ErrorMessage, Spinner, RecipeCard } from '../components/ui'
+import { getCurrentSeason } from '../lib/utils'
 
 const season = getCurrentSeason()
 
@@ -241,36 +241,10 @@ ${pageText.slice(0, 20000)}`
         />
       ) : (
         <div className="grid gap-3 stagger">
-          {filtered.map(r => <RecipeRow key={r.id} recipe={r} />)}
+          {filtered.map(r => <RecipeCard key={r.id} recipe={r} />)}
         </div>
       )}
     </div>
   )
 }
 
-function RecipeRow({ recipe }) {
-  const cal = recipe.calories_per_portion
-  return (
-    <Link to={`/recipes/${recipe.id}`} className="card p-4 flex items-center justify-between group">
-      <div className="flex-1 min-w-0 mr-4">
-        <p className="font-medium text-nook-dark group-hover:text-ember-500 transition-colors font-body truncate">
-          {recipe.name}
-        </p>
-        <p className="text-xs text-nook-muted mt-0.5 font-mono">
-          {lastCookedLabel(recipe.last_cooked_at)}
-        </p>
-      </div>
-      <div className="flex items-center gap-3 shrink-0">
-        {recipe.season?.filter(s => s !== 'all').map(s => (
-          <Tag key={s} variant="season">{s}</Tag>
-        ))}
-        {cal && (
-          <span className={`text-sm font-mono font-medium ${calorieLabelColor(cal)}`}>
-            {cal} kcal
-          </span>
-        )}
-        <span className="text-parchment-300 group-hover:text-parchment-400 transition-colors">→</span>
-      </div>
-    </Link>
-  )
-}

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useRecipes } from '../hooks/useRecipes'
 import { useCookLog } from '../hooks/useCookLog'
-import { getCurrentSeason, SEASON_EMOJI, lastCookedLabel, calorieLabel, calorieLabelColor } from '../lib/utils'
+import { RecipeCard } from '../components/ui'
+import { getCurrentSeason, SEASON_EMOJI } from '../lib/utils'
 
 const season = getCurrentSeason()
 
@@ -42,8 +43,8 @@ export default function Home() {
       {/* Seasonal picks */}
       {!rLoading && seasonal.length > 0 && (
         <Section title={`${SEASON_EMOJI[season]} Good for ${season}`} to="/recipes">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 stagger">
-            {seasonal.map(r => <MiniRecipeCard key={r.id} recipe={r} />)}
+          <div className="grid gap-2 stagger">
+            {seasonal.map(r => <RecipeCard key={r.id} recipe={r} />)}
           </div>
         </Section>
       )}
@@ -67,8 +68,8 @@ export default function Home() {
       {/* Never tried */}
       {!rLoading && neverCooked.length > 0 && (
         <Section title="🌱 Not tried yet" to="/recipes">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 stagger">
-            {neverCooked.map(r => <MiniRecipeCard key={r.id} recipe={r} />)}
+          <div className="grid gap-2 stagger">
+            {neverCooked.map(r => <RecipeCard key={r.id} recipe={r} />)}
           </div>
         </Section>
       )}
@@ -118,26 +119,3 @@ function QuickAction({ to, icon, label, accent }) {
   )
 }
 
-function MiniRecipeCard({ recipe }) {
-  const cal = recipe.calories_per_portion
-  return (
-    <Link
-      to={`/recipes/${recipe.id}`}
-      className="card p-3.5 group cursor-pointer"
-    >
-      <p className="font-medium text-sm text-nook-dark group-hover:text-ember-500 transition-colors leading-snug mb-2 line-clamp-2 font-body">
-        {recipe.name}
-      </p>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-nook-muted font-mono">
-          {lastCookedLabel(recipe.last_cooked_at).replace('Cooked ', '')}
-        </span>
-        {cal && (
-          <span className={`text-xs font-mono ${calorieLabelColor(cal)}`}>
-            {cal} kcal
-          </span>
-        )}
-      </div>
-    </Link>
-  )
-}

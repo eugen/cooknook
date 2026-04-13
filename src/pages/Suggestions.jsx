@@ -5,6 +5,7 @@ import { useIngredients } from '../hooks/useIngredients'
 import { useCookLog } from '../hooks/useCookLog'
 import { Button, ErrorMessage, Spinner } from '../components/ui'
 import { getCurrentSeason, SEASON_EMOJI, NUTRITION_GROUP_COLORS } from '../lib/utils'
+import { RecipeCard } from '../components/ui'
 
 const season = getCurrentSeason()
 
@@ -71,7 +72,7 @@ export default function Suggestions() {
           max_tokens: 800,
           messages: [{
             role: 'user',
-            content: `Suggest 2-3 NEW recipe ideas (not already in: ${existingNames}) that feature these ingredients: ${chosen}. Current season: ${season}.
+            content: `Suggest 2-3 NEW recipe ideas (not already in: ${existingNames}) that feature these ingredients: ${chosen}. Current season: ${season}. Be direct and practical — no filler phrases, no enthusiasm, just useful suggestions.
 
 Respond ONLY with JSON, no markdown:
 {
@@ -255,7 +256,7 @@ Respond ONLY with JSON, no markdown:
               </p>
             ) : (
               <div className="space-y-2">
-                {ingredientMatches.map(r => <IngredientMatchCard key={r.id} recipe={r} selected={selectedIngredients} />)}
+                {ingredientMatches.map(r => <RecipeCard key={r.id} recipe={r} />)}
               </div>
             )}
           </div>
@@ -316,48 +317,20 @@ function ModeCard({ mode, selected, onClick, secondary }) {
   )
 }
 
-function IngredientMatchCard({ recipe, selected }) {
-  // Highlight which ingredient(s) triggered the match
-  const matched = selected.filter(name =>
-    recipe.ingredients?.some(ing => ing.toLowerCase().includes(name.toLowerCase()))
-  )
-  return (
-    <Link to={`/recipes/${recipe.id}`} className="card p-4 flex items-center justify-between group">
-      <div className="flex-1 min-w-0 mr-3">
-        <p className="font-medium text-sm text-nook-dark group-hover:text-ember-500 transition-colors font-body">{recipe.name}</p>
-        <div className="flex gap-1.5 mt-1 flex-wrap">
-          {matched.map(name => (
-            <span key={name} className="text-xs bg-parchment-100 text-nook-muted px-2 py-0.5 rounded-full font-body">{name}</span>
-          ))}
-        </div>
-      </div>
-      <span className="text-parchment-300 group-hover:text-parchment-400 transition-colors shrink-0">→</span>
-    </Link>
-  )
-}
 
 function SuggestionCard({ suggestion, recipes }) {
   const linked = recipes.find(r => r.name.toLowerCase() === suggestion.name?.toLowerCase())
+  if (linked) return (
+    <div>
+      <RecipeCard recipe={linked} />
+      {suggestion.reason && <p className="text-sm text-nook-ink font-body mt-2 px-1">{suggestion.reason}</p>}
+    </div>
+  )
   return (
-    <div className="card p-5">
-      <div className="flex items-start justify-between gap-3 mb-1.5">
-        <div>
-          {linked ? (
-            <Link to={`/recipes/${linked.id}`} className="font-display text-lg text-ember-500 hover:text-ember-600 transition-colors">
-              {suggestion.name}
-            </Link>
-          ) : (
-            <p className="font-display text-lg text-nook-dark">{suggestion.name}</p>
-          )}
-          {suggestion.type && (
-            <span className="text-xs font-mono text-nook-muted capitalize">{suggestion.type}</span>
-          )}
-        </div>
-        {suggestion.last_cooked && (
-          <span className="text-xs font-mono text-nook-muted shrink-0">{suggestion.last_cooked}</span>
-        )}
-      </div>
-      <p className="text-sm text-nook-ink font-body">{suggestion.reason}</p>
+    <div className="card p-4">
+      <p className="font-display text-lg text-nook-dark mb-1">{suggestion.name}</p>
+      {suggestion.last_cooked && <p className="text-xs font-mono text-nook-muted mb-1">{suggestion.last_cooked}</p>}
+      {suggestion.reason && <p className="text-sm text-nook-ink font-body">{suggestion.reason}</p>}
     </div>
   )
 }
@@ -403,7 +376,7 @@ function NewIdeaCard({ idea }) {
 }
 
 function buildPrompt({ mode, season, recipesSummary, ingredientsSummary, recentCooks, selectedIngredients, newHint }) {
-  const ctx = `You are a thoughtful home cooking assistant for a family of 2.
+  const ctx = `You are a no-nonsense cooking assistant for a family of 2. Be direct and practical. No flowery intros, no "delightful" or "wonderful" or "perfect for a cozy evening" filler. Skip the enthusiasm. Just useful, specific suggestions with brief honest reasons.
 Current season: ${season}
 Their saved recipes: ${JSON.stringify(recipesSummary)}
 Their pantry ingredients: ${JSON.stringify(ingredientsSummary)}
