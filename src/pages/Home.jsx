@@ -11,17 +11,12 @@ export default function Home() {
 
   const recentlyCooked = log.slice(0, 3)
   const neverCooked    = recipes.filter(r => !r.last_cooked_at).slice(0, 3)
-  const seasonal       = (() => {
-    const pool = recipes.filter(r => !r.season?.length || r.season.includes(season) || r.season.includes('all'))
-    // Seed with today's date so the pick is stable within a day but rotates daily
-    const seed = Number(new Date().toISOString().slice(0, 10).replace(/-/g, ''))
-    const rng  = (n) => { const x = Math.sin(seed + n) * 10000; return x - Math.floor(x) }
-    return pool
-      .map((r, i) => ({ r, sort: rng(i) }))
-      .sort((a, b) => a.sort - b.sort)
-      .slice(0, 4)
-      .map(({ r }) => r)
-  })()
+  const seasonal       = recipes
+    .filter(r => !r.season?.length || r.season.includes(season) || r.season.includes('all'))
+    .map(r => ({ r, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .slice(0, 4)
+    .map(({ r }) => r)
 
   return (
     <div className="page-enter">
