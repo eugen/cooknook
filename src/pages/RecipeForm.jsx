@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useRecipes } from '../hooks/useRecipes'
 import { Button, ErrorMessage, LoadingPage, Spinner } from '../components/ui'
 import { SEASONS, calcCaloriesPer100g, parseTags } from '../lib/utils'
@@ -11,16 +11,24 @@ const EMPTY = {
 }
 
 export default function RecipeForm() {
-  const { id }      = useParams()
-  const navigate    = useNavigate()
+  const { id }       = useParams()
+  const navigate     = useNavigate()
+  const location     = useLocation()
   const { recipes, createRecipe, updateRecipe } = useRecipes()
 
-  const isEdit      = Boolean(id)
-  const existing    = isEdit ? recipes.find(r => r.id === id) : null
+  const isEdit       = Boolean(id)
+  const existing     = isEdit ? recipes.find(r => r.id === id) : null
+  const prefill      = !isEdit ? location.state?.prefill : null
+  const sourceUrl    = !isEdit ? location.state?.sourceUrl : null
 
-  const [form, setForm]           = useState(EMPTY)
-  const [ingredientText, setIT]   = useState('')
-  const [tagText, setTagText]     = useState('')
+  const [form, setForm]           = useState(() => prefill ? {
+    ...EMPTY, ...prefill,
+    calories_per_portion: prefill.calories_per_portion ?? '',
+    portions:             prefill.portions ?? '',
+    total_weight_grams:   '',
+  } : EMPTY)
+  const [ingredientText, setIT]   = useState(() => prefill?.ingredients?.join('\n') ?? '')
+  const [tagText, setTagText]     = useState(() => prefill?.tags?.join(', ') ?? '')
   const [saving, setSaving]       = useState(false)
   const [estimating, setEst]      = useState(false)
   const [error, setError]         = useState(null)
@@ -141,6 +149,12 @@ Respond ONLY with a JSON object, no markdown, no explanation:
       <h1 className="font-display text-3xl text-nook-dark mb-8">
         {isEdit ? 'Edit recipe' : 'New recipe'}
       </h1>
+
+      {sourceUrl && (
+        <div className="mb-6 px-4 py-3 bg-parchment-100 rounded-lg text-xs font-mono text-nook-muted">
+          Imported from <span className="text-nook-ink break-all">{sourceUrl}</span> — review and save
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Name */}
