@@ -48,7 +48,7 @@ export default function Suggestions() {
   // ingredient mode: live client-side match — no AI needed
   const ingredientMatches = selectedIngredients.length > 0
     ? recipes.filter(r =>
-        selectedIngredients.some(name =>
+        selectedIngredients.every(name =>
           r.ingredients?.some(ing => ing.toLowerCase().includes(name.toLowerCase()))
         )
       )
