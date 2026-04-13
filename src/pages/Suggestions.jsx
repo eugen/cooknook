@@ -28,11 +28,19 @@ export default function Suggestions() {
   const [result, setResult]                 = useState(null)
   const [loading, setLoading]               = useState(false)
   const [error, setError]                   = useState(null)
+  const [ingIdeas, setIngIdeas]             = useState(null)
+  const [ingIdeasLoading, setIngIdeasLoad]  = useState(false)
+  const [ingIdeasError, setIngIdeasError]   = useState(null)
 
-  const setModeAndReset = (m) => { setMode(m); setResult(null); setError(null); setSelectedIngredients([]) }
+  const setModeAndReset = (m) => {
+    setMode(m); setResult(null); setError(null)
+    setSelectedIngredients([]); setIngIdeas(null); setIngIdeasError(null)
+  }
 
-  const toggleIngredient = (name) =>
+  const toggleIngredient = (name) => {
     setSelectedIngredients(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name])
+    setIngIdeas(null); setIngIdeasError(null)
+  }
 
   const canSubmit = mode && !loading && mode !== 'ingredient'
 
@@ -44,6 +52,58 @@ export default function Suggestions() {
         )
       )
     : []
+
+  const getIngredientIdeas = async () => {
+    setIngIdeasLoad(true); setIngIdeasError(null)
+    try {
+      const chosen = selectedIngredients.join(', ')
+      const existingNames = recipes.map(r => r.name).join(', ')
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 800,
+          messages: [{
+            role: 'user',
+            content: `Suggest 2-3 NEW recipe ideas (not already in: ${existingNames}) that feature these ingredients: ${chosen}. Current season: ${season}.
+
+Respond ONLY with JSON, no markdown:
+{
+  "ideas": [
+    {
+      "name": "<recipe name>",
+      "description": "<2-3 sentence description>",
+      "key_ingredients": ["<ingredient>"],
+      "why": "<one sentence>"
+    }
+  ]
+}`
+          }]
+        })
+      })
+      const data = await response.json()
+      if (data.error) {
+        const msg = response.status === 529
+          ? 'Anthropic API is overloaded — try again in a moment.'
+          : `API error: ${data.error.message}`
+        throw new Error(msg)
+      }
+      const text = data.content?.map(c => c.text || '').join('') ?? ''
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
+      setIngIdeas(parsed.ideas ?? [])
+    } catch (e) {
+      console.error('Ingredient ideas error:', e)
+      setIngIdeasError(e.message || 'Could not get ideas.')
+    } finally {
+      setIngIdeasLoad(false)
+    }
+  }
 
   const getSuggestion = async () => {
     setLoading(true); setError(null); setResult(null)
@@ -135,20 +195,22 @@ export default function Suggestions() {
             return (
               <div key={group}>
                 <p className={`text-xs font-mono uppercase tracking-wide mb-2 capitalize
-                  ${group === 'protein' ? 'text-sky-600' : group === 'carbs' ? 'text-amber-600' : 'text-sage-600'}`}>
+                  ${{ protein: 'text-sky-600', carbs: 'text-amber-600', fat: 'text-orange-600', produce: 'text-sage-600' }[group]}`}>
                   {group}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {items.sort((a, b) => a.name.localeCompare(b.name)).map(i => {
                     const on = selectedIngredients.includes(i.name)
+                    const activeClass = {
+                      protein: 'bg-sky-100 text-sky-700 ring-1 ring-sky-300',
+                      carbs:   'bg-amber-100 text-amber-700 ring-1 ring-amber-300',
+                      fat:     'bg-orange-100 text-orange-700 ring-1 ring-orange-300',
+                      produce: 'bg-sage-400/20 text-sage-700 ring-1 ring-sage-300',
+                    }[group]
                     return (
                       <button key={i.id} type="button" onClick={() => toggleIngredient(i.name)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-body transition-colors
-                          ${on
-                            ? group === 'protein' ? 'bg-sky-100 text-sky-700 ring-1 ring-sky-300'
-                            : group === 'carbs'   ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-300'
-                            :                       'bg-sage-400/20 text-sage-700 ring-1 ring-sage-300'
-                            : 'bg-parchment-100 text-nook-ink hover:bg-parchment-200'}`}>
+                          ${on ? activeClass : 'bg-parchment-100 text-nook-ink hover:bg-parchment-200'}`}>
                         {i.name}
                       </button>
                     )
@@ -181,16 +243,39 @@ export default function Suggestions() {
 
       <ErrorMessage message={error} />
 
-      {/* Ingredient mode: live recipe matches */}
+      {/* Ingredient mode: live DB matches + AI new ideas */}
       {mode === 'ingredient' && selectedIngredients.length > 0 && (
-        <div className="space-y-3">
-          {ingredientMatches.length === 0 ? (
-            <p className="text-sm text-nook-muted font-body text-center py-6">
-              No recipes found with {selectedIngredients.join(', ')}.
-            </p>
-          ) : (
-            ingredientMatches.map(r => <IngredientMatchCard key={r.id} recipe={r} selected={selectedIngredients} />)
-          )}
+        <div className="space-y-6">
+          {/* DB matches */}
+          <div>
+            <p className="text-xs font-mono text-nook-muted uppercase tracking-wider mb-3">From your recipes</p>
+            {ingredientMatches.length === 0 ? (
+              <p className="text-sm text-nook-muted font-body py-2">
+                No recipes found with {selectedIngredients.join(', ')}.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {ingredientMatches.map(r => <IngredientMatchCard key={r.id} recipe={r} selected={selectedIngredients} />)}
+              </div>
+            )}
+          </div>
+
+          {/* AI new ideas */}
+          <div>
+            <p className="text-xs font-mono text-nook-muted uppercase tracking-wider mb-3">New ideas</p>
+            {ingIdeas ? (
+              <div className="space-y-4">
+                {ingIdeas.map((idea, i) => <NewIdeaCard key={i} idea={idea} />)}
+              </div>
+            ) : (
+              <>
+                <Button onClick={getIngredientIdeas} disabled={ingIdeasLoading} variant="secondary">
+                  {ingIdeasLoading ? <><Spinner className="w-3.5 h-3.5 mr-2 inline" />Thinking…</> : '✨ Suggest new recipes'}
+                </Button>
+                {ingIdeasError && <p className="text-xs text-ember-500 font-body mt-2">{ingIdeasError}</p>}
+              </>
+            )}
+          </div>
         </div>
       )}
 
