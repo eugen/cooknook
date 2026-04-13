@@ -187,7 +187,9 @@ Respond ONLY with a JSON object, no markdown, no explanation:
           <p className="text-xs font-mono text-nook-muted uppercase tracking-wider mb-4">Calories</p>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <Field label="Per portion (kcal)">
-              <input type="number" className="input" value={form.calories_per_portion} onChange={e => set('calories_per_portion', e.target.value)} placeholder="450" />
+              <input type="number" className="input" value={form.calories_per_portion}
+                onChange={e => setForm(f => ({ ...f, calories_per_portion: e.target.value, calorie_source: 'manual' }))}
+                placeholder="450" />
             </Field>
             <Field label="Portions">
               <input type="number" className="input" value={form.portions} onChange={e => set('portions', e.target.value)} placeholder="4" />
