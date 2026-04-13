@@ -142,7 +142,12 @@ ${pageText.slice(0, 20000)}`
       })
 
       const aiData = await apiRes.json()
-      if (aiData.error) throw new Error(`AI error: ${aiData.error.message}`)
+      if (aiData.error) {
+        const msg = apiRes.status === 529
+          ? 'Anthropic API is overloaded right now — wait a moment and try again.'
+          : `AI error: ${aiData.error.message}`
+        throw new Error(msg)
+      }
       const aiText = aiData.content?.map(c => c.text || '').join('') ?? ''
       const parsed = JSON.parse(aiText.replace(/```json|```/g, '').trim())
       navigate('/recipes/new', { state: { prefill: parsed, sourceUrl: url } })

@@ -10,7 +10,7 @@ const season = getCurrentSeason()
 
 const PRIMARY_MODES = [
   { id: 'seasonal',   icon: SEASON_EMOJI[season], label: 'Seasonal pick',   desc: `A ${season} recipe you haven't made recently` },
-  { id: 'meal',       icon: '🍽️',               label: 'Complete a meal', desc: 'Protein + carbs + produce, with a fat' },
+  { id: 'meal',       icon: '🍽️',               label: 'Complete a meal', desc: 'Protein & carbs combinations' },
   { id: 'ingredient', icon: '🧅',               label: 'From ingredient', desc: 'Start with one thing, find what pairs' },
 ]
 
@@ -71,11 +71,19 @@ export default function Suggestions() {
       })
 
       const data = await response.json()
+      if (data.error) {
+        const msg = response.status === 529
+          ? 'Anthropic API is overloaded right now — wait a moment and try again.'
+          : `API error: ${data.error.message}`
+        throw new Error(msg)
+      }
       const text = data.content?.map(c => c.text || '').join('') ?? ''
       const clean = text.replace(/```json|```/g, '').trim()
+      if (!clean) throw new Error('Empty response from AI')
       setResult({ mode, ...JSON.parse(clean) })
     } catch (e) {
-      setError('Could not get suggestions. Make sure your Anthropic API key is configured.')
+      console.error('Suggestion error:', e)
+      setError(e.message || 'Could not get suggestions.')
     } finally {
       setLoading(false)
     }
