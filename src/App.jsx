@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/layout/Layout'
+import AuthGate from './components/AuthGate'
 import Home from './pages/Home'
 import Recipes from './pages/Recipes'
 import RecipeDetail from './pages/RecipeDetail'
@@ -10,6 +11,7 @@ import History from './pages/History'
 
 export default function App() {
   return (
+    <AuthGate>
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
@@ -25,5 +27,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </AuthGate>
   )
 }

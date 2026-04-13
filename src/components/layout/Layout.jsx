@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
 import { getCurrentSeason, SEASON_EMOJI } from '../../lib/utils'
 
 const season = getCurrentSeason()
@@ -12,6 +13,8 @@ const navItems = [
 ]
 
 export default function Layout() {
+  const { signOut } = useAuth()
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Top bar */}
@@ -24,9 +27,17 @@ export default function Layout() {
             </span>
           </NavLink>
 
-          <div className="flex items-center gap-1 text-xs text-nook-muted font-mono">
-            <span>{SEASON_EMOJI[season]}</span>
-            <span className="capitalize">{season}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-xs text-nook-muted font-mono">
+              <span>{SEASON_EMOJI[season]}</span>
+              <span className="capitalize">{season}</span>
+            </div>
+            <button
+              onClick={signOut}
+              className="text-xs text-nook-muted hover:text-nook-ink transition-colors font-body"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </header>
