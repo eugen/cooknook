@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useIngredients } from '../hooks/useIngredients'
 import { LoadingPage, EmptyState, Button, Tag, ErrorMessage } from '../components/ui'
 import {
@@ -180,10 +181,18 @@ return true
         <div className="grid gap-2 stagger">
           {filtered.map(ing => (
             <div key={ing.id} className="card px-4 py-3 flex items-center justify-between">
-              <div className="flex-1 min-w-0 mr-3">
-                <p className="font-medium text-sm text-nook-dark font-body">{ing.name}</p>
-                {ing.notes && <p className="text-xs text-nook-muted mt-0.5 truncate font-body">{ing.notes}</p>}
-              </div>
+              {['protein','carbs','produce','fat'].includes(ing.nutrition_group) ? (
+                <Link to="/suggestions" state={{ mode: 'ingredient', selectedIngredients: [ing.name] }}
+                  className="flex-1 min-w-0 mr-3 group/link">
+                  <p className="font-medium text-sm text-nook-dark group-hover/link:text-ember-500 transition-colors font-body">{ing.name}</p>
+                  {ing.notes && <p className="text-xs text-nook-muted mt-0.5 truncate font-body">{ing.notes}</p>}
+                </Link>
+              ) : (
+                <div className="flex-1 min-w-0 mr-3">
+                  <p className="font-medium text-sm text-nook-dark font-body">{ing.name}</p>
+                  {ing.notes && <p className="text-xs text-nook-muted mt-0.5 truncate font-body">{ing.notes}</p>}
+                </div>
+              )}
               <div className="flex items-center gap-2 shrink-0">
                 {ing.nutrition_group && (
                   <span className={`text-xs font-mono px-2 py-0.5 rounded-full capitalize ${NUTRITION_GROUP_COLORS[ing.nutrition_group] ?? 'bg-parchment-100 text-nook-muted'}`}>

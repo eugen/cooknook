@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useRecipes } from '../hooks/useRecipes'
 import { useIngredients } from '../hooks/useIngredients'
 import { useCookLog } from '../hooks/useCookLog'
@@ -21,8 +21,9 @@ export default function Suggestions() {
   const { ingredients } = useIngredients()
   const { log }         = useCookLog()
 
-  const [mode, setMode]                     = useState(null)
-  const [selectedIngredients, setSelectedIngredients] = useState([])
+  const location = useLocation()
+  const [mode, setMode]                     = useState(location.state?.mode ?? null)
+  const [selectedIngredients, setSelectedIngredients] = useState(location.state?.selectedIngredients ?? [])
   const [newHint, setNewHint]               = useState('')
   const [result, setResult]                 = useState(null)
   const [loading, setLoading]               = useState(false)
@@ -33,7 +34,16 @@ export default function Suggestions() {
   const toggleIngredient = (name) =>
     setSelectedIngredients(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name])
 
-  const canSubmit = mode && !loading && (mode !== 'ingredient' || selectedIngredients.length > 0)
+  const canSubmit = mode && !loading && mode !== 'ingredient'
+
+  // ingredient mode: live client-side match — no AI needed
+  const ingredientMatches = selectedIngredients.length > 0
+    ? recipes.filter(r =>
+        selectedIngredients.some(name =>
+          r.ingredients?.some(ing => ing.toLowerCase().includes(name.toLowerCase()))
+        )
+      )
+    : []
 
   const getSuggestion = async () => {
     setLoading(true); setError(null); setResult(null)
@@ -119,7 +129,7 @@ export default function Suggestions() {
       {/* Mode extras */}
       {mode === 'ingredient' && (
         <div className="mb-4 animate-fade-in space-y-3">
-          {['protein', 'carbs', 'produce'].map(group => {
+          {['protein', 'carbs', 'produce', 'fat'].map(group => {
             const items = ingredients.filter(i => i.nutrition_group === group)
             if (!items.length) return null
             return (
@@ -147,7 +157,7 @@ export default function Suggestions() {
               </div>
             )
           })}
-          {!['protein', 'carbs', 'produce'].some(g => ingredients.some(i => i.nutrition_group === g)) && (
+          {!['protein', 'carbs', 'produce', 'fat'].some(g => ingredients.some(i => i.nutrition_group === g)) && (
             <p className="text-xs text-nook-muted font-body">
               No ingredients with nutrition groups yet — add them in the Pantry.
             </p>
@@ -163,13 +173,29 @@ export default function Suggestions() {
         </div>
       )}
 
-      <Button onClick={getSuggestion} disabled={!canSubmit} variant="ember" className="w-full justify-center mb-6">
-        {loading ? <><Spinner className="w-4 h-4 mr-2 inline" />Thinking…</> : '✨ Get suggestions'}
-      </Button>
+      {mode !== 'ingredient' && (
+        <Button onClick={getSuggestion} disabled={!canSubmit} variant="ember" className="w-full justify-center mb-6">
+          {loading ? <><Spinner className="w-4 h-4 mr-2 inline" />Thinking…</> : '✨ Get suggestions'}
+        </Button>
+      )}
 
       <ErrorMessage message={error} />
 
-      {result && (
+      {/* Ingredient mode: live recipe matches */}
+      {mode === 'ingredient' && selectedIngredients.length > 0 && (
+        <div className="space-y-3">
+          {ingredientMatches.length === 0 ? (
+            <p className="text-sm text-nook-muted font-body text-center py-6">
+              No recipes found with {selectedIngredients.join(', ')}.
+            </p>
+          ) : (
+            ingredientMatches.map(r => <IngredientMatchCard key={r.id} recipe={r} selected={selectedIngredients} />)
+          )}
+        </div>
+      )}
+
+      {/* AI modes: async results */}
+      {result && mode !== 'ingredient' && (
         <div className="animate-fade-in space-y-4">
           {result.intro && (
             <p className="text-sm text-nook-ink font-body italic border-l-2 border-parchment-300 pl-4">
@@ -202,6 +228,26 @@ function ModeCard({ mode, selected, onClick, secondary }) {
         <p className={`text-xs mt-0.5 font-body ${selected ? 'text-parchment-300' : 'text-nook-muted'}`}>{mode.desc}</p>
       </div>
     </button>
+  )
+}
+
+function IngredientMatchCard({ recipe, selected }) {
+  // Highlight which ingredient(s) triggered the match
+  const matched = selected.filter(name =>
+    recipe.ingredients?.some(ing => ing.toLowerCase().includes(name.toLowerCase()))
+  )
+  return (
+    <Link to={`/recipes/${recipe.id}`} className="card p-4 flex items-center justify-between group">
+      <div className="flex-1 min-w-0 mr-3">
+        <p className="font-medium text-sm text-nook-dark group-hover:text-ember-500 transition-colors font-body">{recipe.name}</p>
+        <div className="flex gap-1.5 mt-1 flex-wrap">
+          {matched.map(name => (
+            <span key={name} className="text-xs bg-parchment-100 text-nook-muted px-2 py-0.5 rounded-full font-body">{name}</span>
+          ))}
+        </div>
+      </div>
+      <span className="text-parchment-300 group-hover:text-parchment-400 transition-colors shrink-0">→</span>
+    </Link>
   )
 }
 
@@ -324,35 +370,6 @@ Respond ONLY with JSON, no markdown:
       "produce": "<ingredient name>",
       "fat": "<ingredient name or null>",
       "description": "<1-2 sentences on how to bring it together>"
-    }
-  ]
-}`
-  }
-
-  if (mode === 'ingredient') {
-    const chosen = selectedIngredients.join(', ')
-    const multiple = selectedIngredients.length > 1
-    return `${ctx}
-
-The user has selected these ingredients to cook with: ${chosen}
-
-Give:
-1. 2-3 of their SAVED RECIPES that feature or pair well with ${multiple ? 'some or all of these ingredients' : chosen}
-2. 2-3 ideas for how to combine ${multiple ? 'these ingredients together' : `${chosen} with other pantry ingredients`} into a simple dish (not necessarily from their recipe list)
-
-Respond ONLY with JSON, no markdown:
-{
-  "intro": "<one warm sentence about these ingredients>",
-  "suggestions": [
-    {
-      "type": "recipe",
-      "name": "<exact recipe name from their list>",
-      "reason": "<1-2 sentences>"
-    },
-    {
-      "type": "idea",
-      "name": "<short dish name or combo, e.g. 'pan-fried chicken with rice and wilted greens'>",
-      "reason": "<1-2 sentences on how to make it work>"
     }
   ]
 }`
